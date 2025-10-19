@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-
+export const runtime = 'edge';
 function validateContentLink(link: string): boolean {
   try {
     const url = new URL(link.trim().toLowerCase());
@@ -34,7 +34,7 @@ function validateContentLink(link: string): boolean {
     return false;
   }
 }
-export const runtime = 'edge';
+
 export async function GET() {
   try {
     const contents = await db.content.findMany({
