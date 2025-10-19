@@ -34,7 +34,7 @@ function validateContentLink(link: string): boolean {
     return false;
   }
 }
-
+export const runtime = 'edge';
 export async function GET() {
   try {
     const contents = await db.content.findMany({
