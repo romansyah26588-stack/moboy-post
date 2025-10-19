@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
-
+export const runtime = 'edge';
 const PUMP_FUN_CONTRACT = '6aUG5S4YCyy4MWH6rtkDuF8fmYwwwPyKq4MypCCQpump';
 
 export async function GET() {
