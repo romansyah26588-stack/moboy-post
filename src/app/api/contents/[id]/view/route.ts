@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 
 export const runtime = 'edge';
 export async function GET(request) {
-  // kode API Anda di sini
+  // kode API Anda
 }
 export async function POST(
   request: NextRequest,
