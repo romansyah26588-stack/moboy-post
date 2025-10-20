@@ -1,6 +1,0 @@
-# Bagian ini akan menjadi database default untuk pengembangan lokal (wrangler dev)
-[[d1_databases]]
-binding = "DB"
-database_name = "db_moboy"
-database_id = "7b5fefc4-3ee3-4ace-b16e-2add66d77279" 
-migrations_dir = "migrations"
