@@ -1,4 +1,4 @@
-name = "nama-proyek-anda"
+name = "moboy-post"
 main = "path/ke/worker.js" # Biasanya diurus oleh Next.js/Pages
 
 # 💡 Bagian ini yang krusial untuk Binding D1
