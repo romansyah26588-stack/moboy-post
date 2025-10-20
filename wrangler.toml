@@ -1,0 +1,8 @@
+name = "nama-proyek-anda"
+main = "path/ke/worker.js" # Biasanya diurus oleh Next.js/Pages
+
+# 💡 Bagian ini yang krusial untuk Binding D1
+[[d1_databases]]
+binding = "DB"
+database_name = "my_content_db"
+database_id = "YOUR_DATABASE_ID_FROM_DASHBOARD" # Ganti dengan ID Database Anda
