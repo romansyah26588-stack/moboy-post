@@ -4,5 +4,5 @@ main = "path/ke/worker.js" # Biasanya diurus oleh Next.js/Pages
 # 💡 Bagian ini yang krusial untuk Binding D1
 [[d1_databases]]
 binding = "DB"
-database_name = "my_content_db"
-database_id = "YOUR_DATABASE_ID_FROM_DASHBOARD" # Ganti dengan ID Database Anda
+database_name = "db_moboy"
+database_id = "7b5fefc4-3ee3-4ace-b16e-2add66d77279" # Ganti dengan ID Database Anda
