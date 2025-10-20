@@ -1,4 +1,8 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
   provider = "prisma-client-js"
@@ -6,41 +10,43 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
 }
 
 model User {
-  id              String   @id @default(cuid())
-  walletAddress   String   @unique
+  id              String    @id @default(cuid())
+  walletAddress   String    @unique
   name            String?
   profileImage    String?
-  totalEarnings   Float    @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  totalEarnings   Float     @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   
   contents        Content[]
   earnings        Earning[]
 }
 
 model Content {
-  id            String   @id @default(cuid())
-  link          String   @unique
-  userId        String
-  walletAddress String
-  viewCount     Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String    @id @default(cuid())
+  link            String    @unique
+  userId          String    // Foreign Key ke User
+  viewCount       Int       @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Bidang 'walletAddress' Dihapus karena Redundan.
+  // Informasi ini dapat diakses melalui relasi 'user'.
+  
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Earning {
-  id            String   @id @default(cuid())
-  userId        String
-  amount        Float
-  description   String?
-  createdAt     DateTime @default(now())
+  id              String    @id @default(cuid())
+  userId          String
+  amount          Float
+  description     String?
+  createdAt       DateTime  @default(now())
   
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
