@@ -5,4 +5,4 @@ main = "path/ke/worker.js" # Biasanya diurus oleh Next.js/Pages
 [[d1_databases]]
 binding = "DB"
 database_name = "db_moboy"
-database_id = "7b5fefc4-3ee3-4ace-b16e-2add66d77279" # Ganti dengan ID Database Anda
+database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865" # Ganti dengan ID Database Anda
