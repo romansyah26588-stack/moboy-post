@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, { env }: { env: Env }) {
             );
         }
 
-        // 1. Validasi Link
+        // 1. Validasi text Link
         if (!validateContentLink(link)) {
             return NextResponse.json(
                 { error: 'Failed To Submit (Invalid Content Link Format)' },
