@@ -1,9 +1,24 @@
+# Nama proyek Anda di Cloudflare
 name = "moboy-post"
-compatibility_date = "2024-10-21" 
+
+# WAJIB: Tentukan direktori output build.
+# next-on-pages menyimpan output build-nya di sini.
+pages_build_output_dir = ".vercel/output/static"
+
+# PENTING: Pengaturan Kompatibilitas Runtime
+# Tanggal kompatibilitas
+compatibility_date = "2024-10-21"
+
+# Mengaktifkan kompatibilitas Node.js untuk Next.js dan D1
 compatibility_flags = [ "nodejs_compat" ]
 
-# 💡 Bagian ini yang krusial untuk Binding D1
+# 💡 Bagian Binding D1 Anda
 [[d1_databases]]
+# Nama Binding yang diakses di kode (process.env.DB)
 binding = "DB"
+
+# Nama database Anda
 database_name = "db_moboy"
-database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865" # Ganti dengan ID Database Anda
+
+# ID Database unik Anda
+database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865"
