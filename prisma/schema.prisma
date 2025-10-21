@@ -38,7 +38,7 @@ model Content {
   // Bidang 'walletAddress' Dihapus karena Redundan.
   // Informasi ini dapat diakses melalui relasi 'user'.
   
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Earning {
@@ -48,5 +48,5 @@ model Earning {
   description     String?
   createdAt       DateTime  @default(now())
   
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
