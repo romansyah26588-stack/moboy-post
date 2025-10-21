@@ -1,3 +1,7 @@
+name = "moboy-post"
+compatibility_date = "2024-10-21" 
+compatibility_flags = [ "nodejs_compat" ]
+
 # 💡 Bagian ini yang krusial untuk Binding D1
 [[d1_databases]]
 binding = "DB"
