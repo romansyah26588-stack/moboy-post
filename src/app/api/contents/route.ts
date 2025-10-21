@@ -3,21 +3,33 @@ import { NextRequest, NextResponse } from 'next/server';
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
 export const runtime = 'edge';
 
-// Headers CORS untuk memungkinkan komunikasi dari frontend
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*', // Ganti dengan domain frontend Anda jika perlu
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
 // Interface untuk mendapatkan akses ke D1 binding
+// Pastikan nama binding D1 di Cloudflare Pages Anda adalah 'DB'
 interface Env {
     DB: D1Database;
 }
 
-/**
- * Fungsi untuk menangani Pre-flight Request (OPTIONS)
- */
+// Headers CORS untuk memungkinkan komunikasi dari frontend
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*', 
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// --- [ UTILITY FUNCTIONS ] ---
+
+function validateContentLink(link: string): boolean {
+    try {
+        const url = new URL(link.trim().toLowerCase());
+        if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.hostname.length < 3) {
+            return false;
+        }
+        return true; 
+    } catch (error) {
+        return false;
+    }
+}
+
 export function OPTIONS() {
     return new NextResponse(null, { 
         status: 204, 
@@ -25,46 +37,27 @@ export function OPTIONS() {
     });
 }
 
-/**
- * Fungsi utilitas untuk memvalidasi format link konten
- */
-function validateContentLink(link: string): boolean {
-    try {
-        const url = new URL(link.trim().toLowerCase());
-        
-        // Memeriksa protokol dan hostname dasar
-        if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.hostname.length < 3) {
-            return false;
-        }
+// --- [ HANDLER GET: Mengambil daftar konten ] ---
 
-        return true; 
-    } catch (error) {
-        return false;
-    }
-}
-
-/**
- * Handler GET: Mengambil daftar konten
- */
 export async function GET(request: NextRequest, { env }: { env: Env }) {
     try {
         const db = env.DB;
 
-        // Menggunakan Kueri D1 untuk mengambil konten dan data pengguna
+        // Kueri D1 untuk mengambil konten dan data pengguna
         const contents = await db.prepare(`
             SELECT 
                 c.link, 
-                c.walletAddress, 
+                u.walletAddress, -- Mengambil walletAddress dari tabel users
                 c.createdAt, 
                 u.name AS userName 
-            FROM contents c
-            JOIN users u ON c.userId = u.id
+            FROM Content c
+            JOIN User u ON c.userId = u.walletAddress -- RELASI DENGAN WALLETADDRESS DI SINI
             ORDER BY c.createdAt DESC
         `).all();
 
         return NextResponse.json(contents.results, { headers: corsHeaders });
     } catch (error) {
-        console.error('Error fetching contents:', error.message);
+        console.error('Error fetching contents (D1):', error); 
         return NextResponse.json(
             { error: 'Failed to fetch contents', detail: error.message },
             { status: 500, headers: corsHeaders }
@@ -72,14 +65,13 @@ export async function GET(request: NextRequest, { env }: { env: Env }) {
     }
 }
 
-/**
- * Handler POST: Membuat konten baru
- */
+// --- [ HANDLER POST: Membuat konten baru ] ---
+
 export async function POST(request: NextRequest, { env }: { env: Env }) {
     try {
         const db = env.DB;
         const body = await request.json();
-        const { link, walletAddress } = body; // Pastikan menggunakan body yang sudah di-parse
+        const { link, walletAddress } = body; 
 
         if (!link || !walletAddress) {
             return NextResponse.json(
@@ -88,7 +80,6 @@ export async function POST(request: NextRequest, { env }: { env: Env }) {
             );
         }
 
-        // 1. Validasi text Link
         if (!validateContentLink(link)) {
             return NextResponse.json(
                 { error: 'Failed To Submit (Invalid Content Link Format)' },
@@ -99,9 +90,9 @@ export async function POST(request: NextRequest, { env }: { env: Env }) {
         const normalizedLink = link.trim().toLowerCase();
         const normalizedWalletAddress = walletAddress.trim();
         
-        // 2. Cek duplikat link
+        // Cek duplikat link
         const existingContent = await db.prepare(`
-            SELECT id FROM contents WHERE link = ?
+            SELECT id FROM Content WHERE link = ?
         `).bind(normalizedLink).first();
 
         if (existingContent) {
@@ -111,69 +102,34 @@ export async function POST(request: NextRequest, { env }: { env: Env }) {
             );
         }
 
-        // 3. Cari atau buat pengguna (Perbaikan utama di sini untuk keandalan D1)
+        // Cek pengguna (Asumsi: Pengguna sudah dibuat/di-upsert melalui rute /api/users)
         let user = await db.prepare(`
-            SELECT id FROM users WHERE walletAddress = ?
-        `).bind(normalizedWalletAddress).first<{ id: number }>();
-
-        let userId: number;
+            SELECT walletAddress FROM User WHERE walletAddress = ?
+        `).bind(normalizedWalletAddress).first<{ walletAddress: string }>();
         
         if (!user) {
-            // 3a. Buat pengguna baru
-            const insertResult = await db.prepare(`
-                INSERT INTO users (walletAddress, createdAt) VALUES (?, datetime('now')) 
-            `).bind(normalizedWalletAddress).run();
-            
-            if (!insertResult.success) {
-                console.error("Failed to insert new user:", insertResult.error);
-                return NextResponse.json(
-                    { error: 'Failed To Submit (DB Error: Cannot create user)', detail: insertResult.error },
-                    { status: 500, headers: corsHeaders }
-                );
-            }
-            
-            // 3b. Ambil ID yang baru dibuat (Metode yang paling andal di D1)
-            const lastIdResult = await db.prepare(`SELECT last_insert_rowid() as id`).first<{ id: number }>();
-            
-            if (lastIdResult && lastIdResult.id) {
-                userId = lastIdResult.id;
-            } else {
-                console.error("Failed to retrieve last_insert_rowid after user creation.");
-                return NextResponse.json(
-                    { error: 'Failed To Submit (Internal DB Error: Cannot get user ID)' },
-                    { status: 500, headers: corsHeaders }
-                );
-            }
-        } else {
-            userId = user.id;
-        }
-
-        // 4. Buat konten (menggunakan D1)
-        const contentResult = await db.prepare(`
-            INSERT INTO contents (link, userId, walletAddress, createdAt) 
-            VALUES (?, ?, ?, datetime('now'))
-        `).bind(normalizedLink, userId, normalizedWalletAddress).run();
-
-        if (!contentResult.success) {
-            // Jika INSERT konten gagal (misalnya karena skema tabel)
-            console.error("Failed to insert new content:", contentResult.error);
+            // Jika user belum ada, dianggap gagal. Rute ini TIDAK membuat user.
             return NextResponse.json(
-                { error: 'Failed To Submit (DB Error: Cannot create content)', detail: contentResult.error },
-                { status: 500, headers: corsHeaders }
+                { error: 'Failed To Submit: User wallet not found. Please register first.' },
+                { status: 403, headers: corsHeaders }
             );
         }
 
-        // 5. Sukses
+        // Buat konten (menggunakan walletAddress sebagai FK karena schema Prisma Anda)
+        await db.prepare(`
+            INSERT INTO Content (link, userId, createdAt) 
+            VALUES (?, ?, datetime('now'))
+        `).bind(normalizedLink, normalizedWalletAddress).run(); 
+        // Catatan: Di sini userId = walletAddress, sesuai dengan relasi di schema Anda
+
         return NextResponse.json(
             { message: "Content created successfully" }, 
             { status: 201, headers: corsHeaders }
         );
 
     } catch (error) {
-        // PENTING: Log error detail ke Cloudflare Logs
-        console.error('Error creating content (DETAIL):', error.message); 
+        console.error('Error creating content (DETAIL):', error); 
         
-        // Error 500 generik untuk kasus lain (misalnya masalah koneksi JSON/DB yang tidak tertangkap)
         return NextResponse.json(
             { error: 'Failed to create content', detail: error.message },
             { status: 500, headers: corsHeaders }
