@@ -19,10 +19,10 @@ interface Env {
  * Fungsi untuk menangani Pre-flight Request (OPTIONS)
  */
 export function OPTIONS() {
-  return new NextResponse(null, { 
-      status: 204, 
-      headers: corsHeaders 
-  });
+    return new NextResponse(null, { 
+        status: 204, 
+        headers: corsHeaders 
+    });
 }
 
 /**
@@ -37,7 +37,6 @@ function validateContentLink(link: string): boolean {
             return false;
         }
 
-        // Kriteria validasi TLD (disimpan untuk referensi, tapi validasi URL standar lebih disarankan)
         return true; 
     } catch (error) {
         return false;
@@ -51,7 +50,7 @@ export async function GET(request: NextRequest, { env }: { env: Env }) {
     try {
         const db = env.DB;
 
-        // ⚠️ Menggunakan Kueri D1 untuk mengambil konten dan data pengguna
+        // Menggunakan Kueri D1 untuk mengambil konten dan data pengguna
         const contents = await db.prepare(`
             SELECT 
                 c.link, 
@@ -79,7 +78,8 @@ export async function GET(request: NextRequest, { env }: { env: Env }) {
 export async function POST(request: NextRequest, { env }: { env: Env }) {
     try {
         const db = env.DB;
-        const { link, walletAddress } = await request.json();
+        const body = await request.json();
+        const { link, walletAddress } = body; // Pastikan menggunakan body yang sudah di-parse
 
         if (!link || !walletAddress) {
             return NextResponse.json(
@@ -97,6 +97,7 @@ export async function POST(request: NextRequest, { env }: { env: Env }) {
         }
         
         const normalizedLink = link.trim().toLowerCase();
+        const normalizedWalletAddress = walletAddress.trim();
         
         // 2. Cek duplikat link
         const existingContent = await db.prepare(`
@@ -110,46 +111,71 @@ export async function POST(request: NextRequest, { env }: { env: Env }) {
             );
         }
 
-        // 3. Cari atau buat pengguna (menggunakan D1)
+        // 3. Cari atau buat pengguna (Perbaikan utama di sini untuk keandalan D1)
         let user = await db.prepare(`
             SELECT id FROM users WHERE walletAddress = ?
-        `).bind(walletAddress).first();
+        `).bind(normalizedWalletAddress).first<{ id: number }>();
 
         let userId: number;
         
         if (!user) {
-            // Buat pengguna baru (mengasumsikan tabel users memiliki kolom id, walletAddress, dan name opsional)
-            const result = await db.prepare(`
+            // 3a. Buat pengguna baru
+            const insertResult = await db.prepare(`
                 INSERT INTO users (walletAddress, createdAt) VALUES (?, datetime('now')) 
-                RETURNING id 
-            `).bind(walletAddress).run(); 
+            `).bind(normalizedWalletAddress).run();
             
-            // D1 biasanya tidak langsung mengembalikan ID. Ini adalah workaround yang disederhanakan.
-            // Metode yang lebih andal adalah menjalankan SELECT last_insert_rowid()
-            const lastId = await db.prepare(`SELECT last_insert_rowid()`).first('last_insert_rowid');
-            userId = lastId as number;
+            if (!insertResult.success) {
+                console.error("Failed to insert new user:", insertResult.error);
+                return NextResponse.json(
+                    { error: 'Failed To Submit (DB Error: Cannot create user)', detail: insertResult.error },
+                    { status: 500, headers: corsHeaders }
+                );
+            }
+            
+            // 3b. Ambil ID yang baru dibuat (Metode yang paling andal di D1)
+            const lastIdResult = await db.prepare(`SELECT last_insert_rowid() as id`).first<{ id: number }>();
+            
+            if (lastIdResult && lastIdResult.id) {
+                userId = lastIdResult.id;
+            } else {
+                console.error("Failed to retrieve last_insert_rowid after user creation.");
+                return NextResponse.json(
+                    { error: 'Failed To Submit (Internal DB Error: Cannot get user ID)' },
+                    { status: 500, headers: corsHeaders }
+                );
+            }
         } else {
-            userId = user.id as number;
+            userId = user.id;
         }
 
         // 4. Buat konten (menggunakan D1)
         const contentResult = await db.prepare(`
             INSERT INTO contents (link, userId, walletAddress, createdAt) 
             VALUES (?, ?, ?, datetime('now'))
-        `).bind(link.trim(), userId, walletAddress).run();
+        `).bind(normalizedLink, userId, normalizedWalletAddress).run();
+
+        if (!contentResult.success) {
+            // Jika INSERT konten gagal (misalnya karena skema tabel)
+            console.error("Failed to insert new content:", contentResult.error);
+            return NextResponse.json(
+                { error: 'Failed To Submit (DB Error: Cannot create content)', detail: contentResult.error },
+                { status: 500, headers: corsHeaders }
+            );
+        }
 
         // 5. Sukses
         return NextResponse.json(
-            { message: "Content created successfully", result: contentResult }, 
+            { message: "Content created successfully" }, 
             { status: 201, headers: corsHeaders }
         );
 
     } catch (error) {
-        // ⚠️ PENTING: Log error detail ke Cloudflare Logs
+        // PENTING: Log error detail ke Cloudflare Logs
         console.error('Error creating content (DETAIL):', error.message); 
         
+        // Error 500 generik untuk kasus lain (misalnya masalah koneksi JSON/DB yang tidak tertangkap)
         return NextResponse.json(
-            { error: 'Failed to create content', detail: error.message }, // Detail error membantu debugging
+            { error: 'Failed to create content', detail: error.message },
             { status: 500, headers: corsHeaders }
         );
     }
