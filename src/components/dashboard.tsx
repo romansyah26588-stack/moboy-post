@@ -249,7 +249,7 @@ export function Dashboard() {
                 </Button>
               </div>
               <p className="text-xs futuristic-muted text-center">
-                Valid content links: YouTube, Twitter, Instagram, TikTok, Facebook, Reddit, and more
+                Valid content links: YouTube, x.com, Instagram, TikTok, Facebook, Reddit, and more
               </p>
               {!isConnected && (
                 <p className="text-sm futuristic-muted text-center">
