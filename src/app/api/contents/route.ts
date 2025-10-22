@@ -1,12 +1,13 @@
+// 2. src/app/api/contents/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
 export const runtime = 'edge';
 
 // Interface untuk mendapatkan akses ke D1 binding
-// 'DB' di sini HARUS COCOK dengan 'Variable name' di konfigurasi Cloudflare Pages Anda.
+// PERBAIKAN: Ganti 'db_moboy' dengan tipe data global Cloudflare D1Database
 interface Env {
-    DB: db_moboy;
+    DB: D1Database;
 }
 
 // Headers CORS untuk memungkinkan komunikasi dari frontend
@@ -31,7 +32,6 @@ function validateContentLink(link: string): boolean {
 }
 
 // --- [ HANDLER OPTIONS ] ---
-// Diperlukan untuk pra-penerbangan (preflight) CORS
 export function OPTIONS() {
     return new NextResponse(null, {
         status: 204,
@@ -41,11 +41,9 @@ export function OPTIONS() {
 
 // --- [ HANDLER GET: Mengambil daftar konten ] ---
 
-// Perbaikan: Mengubah signature fungsi untuk menerima 'context' yang lebih standar
-export async function GET(request: NextRequest, context: { env: Env }) {
+export async function GET(request: NextRequest, context: { env: Env }) { // Menggunakan context
     try {
-        // Akses D1 melalui env di context
-        const db = context.env.DB;
+        const db = context.env.DB; // Akses D1 melalui context.env.DB
 
         // Kueri D1 untuk mengambil konten dan data pengguna
         const contents = await db.prepare(`
@@ -59,11 +57,9 @@ export async function GET(request: NextRequest, context: { env: Env }) {
             ORDER BY c.createdAt DESC
         `).all();
 
-        // 'contents' dari D1 sudah dalam format { results: [...] }
         return NextResponse.json(contents.results, { headers: corsHeaders });
     } catch (error: any) {
         console.error('Error fetching contents (D1):', error);
-        // Pastikan error.message disertakan untuk debugging
         return NextResponse.json(
             { error: 'Failed to fetch contents', detail: error.message || 'Unknown Error' },
             { status: 500, headers: corsHeaders }
@@ -73,8 +69,7 @@ export async function GET(request: NextRequest, context: { env: Env }) {
 
 // --- [ HANDLER POST: Membuat konten baru ] ---
 
-// Perbaikan: Mengubah signature fungsi untuk menerima 'context' yang lebih standar
-export async function POST(request: NextRequest, context: { env: Env }) {
+export async function POST(request: NextRequest, context: { env: Env }) { // Menggunakan context
     try {
         const db = context.env.DB;
         const body = await request.json();
@@ -109,7 +104,7 @@ export async function POST(request: NextRequest, context: { env: Env }) {
             );
         }
 
-        // Cek pengguna (Asumsi: Pengguna sudah dibuat/di-upsert melalui rute /api/users)
+        // Cek pengguna
         const user = await db.prepare(`
             SELECT walletAddress FROM User WHERE walletAddress = ?
         `).bind(normalizedWalletAddress).first<{ walletAddress: string }>();
@@ -121,7 +116,7 @@ export async function POST(request: NextRequest, context: { env: Env }) {
             );
         }
 
-        // Buat konten (menggunakan walletAddress sebagai FK)
+        // Buat konten
         await db.prepare(`
             INSERT INTO Content (link, userId, createdAt)
             VALUES (?, ?, datetime('now'))
