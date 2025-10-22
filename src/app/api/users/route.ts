@@ -5,7 +5,7 @@ export const runtime = 'edge';
 
 // Interface untuk mendapatkan akses ke D1 binding
 interface Env {
-    DB: D1Database;
+    DB: db_moboy;
 }
 
 // Headers CORS
