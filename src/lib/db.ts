@@ -1,33 +1,36 @@
-// Ganti seluruh isi file src/lib/db.ts Anda dengan kode di bawah ini:
+// src/lib/db.ts (Dibuat agar dapat menerima D1 binding secara eksplisit)
 
-// 1. Ganti impor dari '@prisma/client' ke '@prisma/client/edge'
 import { PrismaClient } from '@prisma/client/edge';
+import { PrismaD1 } from '@prisma/adapter-d1';
 
-// 2. Tambahkan impor untuk D1 Adapter
-// Pastikan Anda sudah menjalankan: npm install @prisma/adapter-d1
-// import { PrismaD1 } from '@prisma/adapter-d1'; 
-// Catatan: Next-on-Pages sering kali bekerja lebih baik tanpa adapter eksplisit
-// selama konfigurasi DATABASE_URL di bawah sudah diatur.
+// Catatan: Interface ini mungkin perlu Anda definisikan di tempat lain (misalnya types/bindings.ts)
+// D1Database adalah tipe global di Cloudflare Worker.
+interface Env {
+    // Ganti 'DB' jika nama binding Anda berbeda di wrangler.toml
+    DB: D1Database;
+}
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+// Global cache for PrismaClient (optional, but good practice)
+let cachedPrisma: PrismaClient;
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    // Konfigurasi sumber data agar Prisma mencari DATABASE_URL
-    datasources: {
-      db: {
-        // Cloudflare Pages/Wrangler akan secara implisit
-        // mengisi DATABASE_URL dari binding D1 Anda.
-        url: process.env.DATABASE_URL, 
-      },
-    },
-    log: ['query'],
-  });
+export function getPrismaClient(env: Env) {
+    if (cachedPrisma) {
+        return cachedPrisma;
+    }
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+    // Menggunakan D1 adapter secara eksplisit
+    const adapter = new PrismaD1(env.DB);
+    
+    // Inisialisasi Prisma Client dengan adapter
+    const prisma = new PrismaClient({
+        adapter,
+        log: ['query'],
+    });
 
-// Ekspor default
-export default db;
+    // Cache the client for subsequent calls
+    cachedPrisma = prisma;
+    
+    return prisma;
+}
+
+// Catatan: Karena ini fungsi, Anda harus mengimpor dan memanggilnya di setiap API route.
