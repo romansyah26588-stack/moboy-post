@@ -22,3 +22,6 @@ database_name = "db_moboy"
 
 # ID Database unik Anda
 database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865"
+
+# Pastikan folder ini ada dan berisi SQL skema Anda
+migrations_dir = "prisma/migrations" 
