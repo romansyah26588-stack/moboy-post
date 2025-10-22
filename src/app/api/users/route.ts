@@ -1,11 +1,13 @@
+// 3. src/app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
 export const runtime = 'edge';
 
 // Interface untuk mendapatkan akses ke D1 binding
+// PERBAIKAN: Ganti 'db_moboy' dengan tipe data global Cloudflare D1Database
 interface Env {
-    DB: db_moboy;
+    DB: D1Database;
 }
 
 // Headers CORS
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest, context: { env: Env }) {
         const trimmedName = name.trim();
 
         // Logika UPSERT (INSERT OR REPLACE INTO)
-        // Jika walletAddress sudah ada, data nama akan diperbarui. Jika belum ada, data baru akan dibuat.
+        // Perintah ON CONFLICT DO UPDATE ini adalah sintaks SQLite (D1) yang tepat.
         await db.prepare(`
             INSERT INTO User (walletAddress, name, createdAt, updatedAt)
             VALUES (?, ?, datetime('now'), datetime('now'))
@@ -63,5 +65,3 @@ export async function POST(request: NextRequest, context: { env: Env }) {
         );
     }
 }
-// Catatan: Biasanya route users tidak memerlukan GET (karena konten sensitif), 
-// tetapi jika diperlukan, Anda bisa menambahkan fungsi GET di sini.
