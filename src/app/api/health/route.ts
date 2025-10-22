@@ -3,7 +3,10 @@
 import { NextResponse } from "next/server";
 
 // Memastikan rute berjalan di Cloudflare Edge
-export const runtime = 'edge';
+export const runtime = 'edge'; 
+interface Env {
+    DB: D1Database;
+}
 
 /**
  * Handler GET untuk Health Check.
