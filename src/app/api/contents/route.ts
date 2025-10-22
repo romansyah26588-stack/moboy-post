@@ -4,7 +4,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto'; // Anda mungkin perlu menginstal atau mengimpor ini dari 'node:crypto' atau menggunakan bawaan Edge.
 
-// ... (kode lainnya: runtime, Env, corsHeaders, OPTIONS, GET)
+export const runtime = 'edge'; 
+interface Env {
+    DB: D1Database;
+}
 
 // --- [ HANDLER POST: Membuat Konten ] ---
 export async function POST(request: NextRequest, context: { env: Env }) {
