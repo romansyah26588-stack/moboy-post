@@ -6,7 +6,7 @@ export const runtime = 'edge';
 // Interface untuk mendapatkan akses ke D1 binding
 // 'DB' di sini HARUS COCOK dengan 'Variable name' di konfigurasi Cloudflare Pages Anda.
 interface Env {
-    DB: D1Database;
+    DB: db_moboy;
 }
 
 // Headers CORS untuk memungkinkan komunikasi dari frontend
