@@ -3,6 +3,9 @@ import { NextResponse, NextRequest } from 'next/server';
 
 // WAJIB: Mengarahkan rute ke Edge Runtime Cloudflare.
 export const runtime = 'edge'; 
+interface Env {
+    DB: D1Database;
+}
 
 // Ganti logika yang bermasalah (misalnya, SDK Node.js) dengan implementasi Edge-compatible (fetch)
 async function fetchPumpFunDataFromExternalApi() {
