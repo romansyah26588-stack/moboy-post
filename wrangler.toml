@@ -7,7 +7,7 @@ pages_build_output_dir = ".vercel/output/static"
 
 # PENTING: Pengaturan Kompatibilitas Runtime
 # Tanggal kompatibilitas
-compatibility_date = "2025-10-22"
+compatibility_date = "2024-10-21"
 
 # Mengaktifkan kompatibilitas Node.js untuk Next.js dan D1
 compatibility_flags = [ "nodejs_compat" ]
