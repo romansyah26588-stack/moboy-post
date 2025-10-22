@@ -1,21 +1,19 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// 1. schema.prisma
+// Pastikan skema ini sinkron dengan penggunaan walletAddress di API route
 
 generator client {
   provider = "prisma-client-js"
 }
 
+// provider sudah benar: sqlite untuk D1
 datasource db {
   provider = "sqlite"
-  url       = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id              String    @id @default(cuid())
-  walletAddress   String    @unique
+  walletAddress   String    @unique // Kunci ini akan dirujuk
   name            String?
   profileImage    String?
   totalEarnings   Float     @default(0)
@@ -29,24 +27,23 @@ model User {
 model Content {
   id              String    @id @default(cuid())
   link            String    @unique
-  userId          String    // Foreign Key ke User
+  userId          String    // Kunci Asing (Harus menampung walletAddress)
   viewCount       Int       @default(0)
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
-  // Bidang 'walletAddress' Dihapus karena Redundan.
-  // Informasi ini dapat diakses melalui relasi 'user'.
-  
-  users            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // PERBAIKAN: references sekarang menunjuk ke [walletAddress]
+  users           User      @relation(fields: [userId], references: [walletAddress], onDelete: Cascade)
 }
 
 model Earning {
   id              String    @id @default(cuid())
-  userId          String
+  userId          String    // Kunci Asing (Harus menampung walletAddress)
   amount          Float
   description     String?
   createdAt       DateTime  @default(now())
   
-  users            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // PERBAIKAN: references sekarang menunjuk ke [walletAddress]
+  users           User      @relation(fields: [userId], references: [walletAddress], onDelete: Cascade)
 }
