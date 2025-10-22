@@ -1,33 +1,82 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 
+// WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
 export const runtime = 'edge';
-export async function GET(request) {
-  // kode API Anda
+
+// Interface untuk mendapatkan akses ke D1 binding
+interface Env {
+    DB: D1Database;
 }
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const contentId = params.id;
 
-    // Increment view count
-    const content = await db.content.update({
-      where: { id: contentId },
-      data: {
-        viewCount: {
-          increment: 1
-        }
-      }
+// Headers CORS
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// --- [ HANDLER OPTIONS ] ---
+export function OPTIONS() {
+    return new NextResponse(null, {
+        status: 204,
+        headers: corsHeaders
     });
+}
 
-    return NextResponse.json({ viewCount: content.viewCount });
-  } catch (error) {
-    console.error('Error incrementing view count:', error);
-    return NextResponse.json(
-      { error: 'Failed to increment view count' },
-      { status: 500 }
-    );
-  }
+// Fungsi GET tidak diimplementasikan, bisa dibiarkan kosong atau dihapus jika tidak perlu.
+// export async function GET(request: NextRequest, context: { env: Env }) {
+//     return NextResponse.json({ message: "Not implemented" }, { status: 200, headers: corsHeaders });
+// }
+
+// --- [ HANDLER POST: Menambah View Count ] ---
+export async function POST(
+    request: NextRequest,
+    context: { env: Env, params: { id: string } } // Menggunakan context untuk env dan params
+) {
+    try {
+        const db = context.env.DB;
+        const contentId = context.params.id; // Mengambil ID dari URL path
+
+        if (!contentId) {
+             return NextResponse.json(
+                { error: 'Content ID is required' },
+                { status: 400, headers: corsHeaders }
+            );
+        }
+
+        // 1. Lakukan INCREMENT viewCount menggunakan SQL D1
+        const updateResult = await db.prepare(`
+            UPDATE Content 
+            SET viewCount = viewCount + 1, updatedAt = datetime('now')
+            WHERE id = ?
+        `).bind(contentId).run();
+
+        // 2. Jika update gagal (ID tidak ditemukan)
+        if (updateResult.changes === 0) {
+            // Perlu dicek apakah ID ditemukan, jika 0 artinya tidak ada row yang terpengaruh
+             // Jika ingin mendapatkan viewCount terbaru, lakukan SELECT setelah UPDATE.
+             return NextResponse.json(
+                { error: 'Content not found or update failed' },
+                { status: 404, headers: corsHeaders }
+            );
+        }
+        
+        // 3. Ambil viewCount yang baru (perlu kueri terpisah di D1/SQLite)
+        const content = await db.prepare(`
+            SELECT viewCount FROM Content WHERE id = ?
+        `).bind(contentId).first<{ viewCount: number }>();
+
+
+        return NextResponse.json(
+            { viewCount: content ? content.viewCount : null, message: "View count incremented" },
+            { status: 200, headers: corsHeaders }
+        );
+
+    } catch (error: any) {
+        console.error('Error incrementing view count (D1):', error);
+        return NextResponse.json(
+            { error: 'Failed to increment view count', detail: error.message || 'Unknown Error' },
+            { status: 500, headers: corsHeaders }
+        );
+    }
 }
