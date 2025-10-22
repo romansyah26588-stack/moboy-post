@@ -1,16 +1,16 @@
-// src/app/api/users/route.ts
+// File: src/app/api/users/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
 export const runtime = 'edge';
 
-// Interface untuk mendapatkan akses ke D1 binding
+// Interface untuk mendapatkan akses ke D1 binding (Sesuaikan jika nama binding Anda berbeda dari 'DB')
 interface Env {
     DB: D1Database;
 }
 
-// Headers CORS - Tambahkan GET dan POST
+// Headers CORS (PENTING untuk komunikasi klien/server)
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -28,79 +28,40 @@ export function OPTIONS() {
 // ----------------------------------------------------------------------
 
 // ----------------------------------------------------------------------
-// --- [ HANDLER GET: Mengambil Daftar Pengguna ] ---
-// FUNGSI INI MEMPERBAIKI ERROR 405
-export async function GET(request: NextRequest, context: { env: Env }) { 
-    try {
-        const db = context.env.DB; 
-        
-        // Log untuk debug di Cloudflare Pages Logs jika masih 500
-        console.log('Attempting GET query on User table...');
-
-        // Ambil data User.
-        const { results } = await db.prepare("SELECT id, walletAddress, name, totalEarnings, createdAt FROM User").all();
-
+// --- [ HANDLER GET: Uji Koneksi dan Kueri Dasar User ] ---
+export async function GET(request: NextRequest, context: { env: Env }) { 
+    // 1. Pengecekan Binding D1
+    if (!context.env || !context.env.DB) {
         return NextResponse.json(
-            { success: true, users: results || [] },
+            { error: 'FATAL_BINDING_ERROR_USER', detail: 'D1 binding (DB) is missing. Check Cloudflare Pages settings.' },
+            { status: 500, headers: corsHeaders }
+        );
+    }
+
+    const db = context.env.DB;
+    
+    try {
+        // 2. Kueri Paling Dasar: Menguji keberadaan tabel User
+        const { results } = await db.prepare("SELECT id, walletAddress, name FROM User LIMIT 1").all();
+        
+        // JIKA BERHASIL, kembalikan 200 dengan status sukses
+        return NextResponse.json(
+            { success: true, test: 'QUERY_SUCCESS_TEST', users: results || [] },
             { status: 200, headers: corsHeaders }
         );
     } catch (error: any) {
-        // Logging error yang rinci untuk membantu mengatasi Error 500
-        console.error('D1 GET User Query FAILED:', error.stack || error.message);
+        // 3. Tangani SQL Error (jika kueri dasar gagal)
         return NextResponse.json(
-            { error: 'Failed to fetch users', detail: error.message || 'Unknown D1 GET Error' },
+            { 
+                error: 'SQL_EXECUTION_FAILED_USER', 
+                sql_detail: error.message || 'Unknown D1 GET Error',
+                tip: 'Tabel User mungkin salah nama atau belum dimigrasi dengan benar.'
+            },
             { status: 500, headers: corsHeaders }
         );
     }
 }
 // ----------------------------------------------------------------------
 
-// ----------------------------------------------------------------------
-// --- [ HANDLER POST: Membuat/Memperbarui Pengguna (UPSERT) ] ---
-// Kueri ini telah dimodifikasi untuk logging yang lebih baik.
-export async function POST(request: NextRequest, context: { env: Env }) {
-    try {
-        const db = context.env.DB; 
-        const body = await request.json();
-        const { walletAddress, name } = body;
-
-        if (!walletAddress || !name) {
-            return NextResponse.json(
-                { error: 'Wallet address and name are required' },
-                { status: 400, headers: corsHeaders }
-            );
-        }
-
-        const trimmedWallet = walletAddress.trim();
-        const trimmedName = name.trim();
-
-        // Log untuk debug
-        console.log(`Attempting UPSERT for wallet: ${trimmedWallet}`);
-
-        // Logika UPSERT
-        const result = await db.prepare(`
-            INSERT INTO User (walletAddress, name, createdAt, updatedAt)
-            VALUES (?, ?, datetime('now'), datetime('now'))
-            ON CONFLICT(walletAddress) DO UPDATE SET
-                name = excluded.name,
-                updatedAt = datetime('now')
-        `).bind(trimmedWallet, trimmedName).run();
-        
-        // Log untuk hasil kueri
-        console.log('UPSERT result:', result);
-
-        return NextResponse.json(
-            { message: "User registered/updated successfully", walletAddress: trimmedWallet },
-            { status: 201, headers: corsHeaders }
-        );
-
-    } catch (error: any) {
-        // Logging error yang rinci untuk membantu mengatasi Error 500
-        console.error('D1 POST User Query FAILED:', error.stack || error.message);
-        return NextResponse.json(
-            { error: 'Failed to register/update user', detail: error.message || 'Unknown D1 POST Error' },
-            { status: 500, headers: corsHeaders }
-        );
-    }
-}
-// ----------------------------------------------------------------------
+// ... Anda juga harus menerapkan logika pengecekan Binding D1 dan try...catch yang sama 
+//    di dalam fungsi POST /api/users ...
