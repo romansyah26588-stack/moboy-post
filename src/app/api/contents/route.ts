@@ -2,7 +2,6 @@
 
 // ... pastikan Anda memiliki impor ini di bagian atas:
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto'; // Anda mungkin perlu menginstal atau mengimpor ini dari 'node:crypto' atau menggunakan bawaan Edge.
 
 export const runtime = 'edge'; 
 interface Env {
