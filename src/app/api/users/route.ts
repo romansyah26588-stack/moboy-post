@@ -5,40 +5,41 @@ import { NextRequest, NextResponse } from 'next/server';
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
 export const runtime = 'edge';
 
-// Interface untuk mendapatkan akses ke D1 binding (Sesuaikan jika nama binding Anda berbeda dari 'DB')
+// Interface untuk mendapatkan akses ke D1 binding
 interface Env {
-    DB: D1Database;
+    DB: D1Database;
 }
 
-// Headers CORS (PENTING untuk komunikasi klien/server)
+// Headers CORS
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// ----------------------------------------------------------------------
-// --- [ HANDLER OPTIONS: Pre-flight CORS ] ---
+// --- [ HANDLER OPTIONS ] ---
 export function OPTIONS() {
-    return new NextResponse(null, {
-        status: 204,
-        headers: corsHeaders
-    });
+    return new NextResponse(null, {
+        status: 204,
+        headers: corsHeaders
+    });
 }
-// ----------------------------------------------------------------------
 
 // ----------------------------------------------------------------------
 // --- [ HANDLER GET: Uji Koneksi dan Kueri Dasar User ] ---
-export async function GET(request: NextRequest, context: { env: Env }) { 
+export async function GET(
+    request: NextRequest,
+    { env }: { env: Env } // <--- ROUTE STATIS: env ada di argumen kedua
+) {
     // 1. Pengecekan Binding D1
-    if (!context.env || !context.env.DB) {
+    if (!env || !env.DB) {
         return NextResponse.json(
             { error: 'FATAL_BINDING_ERROR_USER', detail: 'D1 binding (DB) is missing. Check Cloudflare Pages settings.' },
             { status: 500, headers: corsHeaders }
         );
     }
 
-    const db = context.env.DB;
+    const db = env.DB;
     
     try {
         // 2. Kueri Paling Dasar: Menguji keberadaan tabel User
@@ -62,6 +63,3 @@ export async function GET(request: NextRequest, context: { env: Env }) { 
     }
 }
 // ----------------------------------------------------------------------
-
-// ... Anda juga harus menerapkan logika pengecekan Binding D1 dan try...catch yang sama 
-//    di dalam fungsi POST /api/users ...
