@@ -1,27 +1,18 @@
-# Nama proyek Anda di Cloudflare
-name = "moboy-post"
-
-# WAJIB: Tentukan direktori output build.
-# next-on-pages menyimpan output build-nya di sini.
+# wrangler.toml
+name = "moboy-post" # Pastikan nama ini sesuai
+compatibility_date = "2024-05-12"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
-# PENTING: Pengaturan Kompatibilitas Runtime
-# Tanggal kompatibilitas
-compatibility_date = "2024-10-21"
-
-# Mengaktifkan kompatibilitas Node.js untuk Next.js dan D1
-compatibility_flags = [ "nodejs_compat" ]
-
-# 💡 Bagian Binding D1 Anda
+# --- INI BAGIAN KRUSIAL ---
 [[d1_databases]]
-# Nama Binding yang diakses di kode (process.env.DB)
+binding = "DB" # Nama binding ini HARUS "DB"
+database_name = "db_moboy" # Ganti dengan nama database D1 Anda
+database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865" # Ganti dengan ID database D1 Anda
+
+# Anda juga bisa menambahkan ini untuk preview environment
+[[d1_databases]]
 binding = "DB"
-
-# Nama database Anda
 database_name = "db_moboy"
-
-# ID Database unik Anda
 database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865"
-
-# Pastikan folder ini ada dan berisi SQL skema Anda
-migrations_dir = "prisma/migrations" 
+# preview_database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Jika punya DB terpisah untuk preview
