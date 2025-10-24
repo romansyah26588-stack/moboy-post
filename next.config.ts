@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 
+// Setup untuk development dengan Cloudflare Pages
+const { setupDevPlatform } = require('@cloudflare/next-on-pages/next-dev');
+
+if (process.env.NODE_ENV === 'development') {
+  await setupDevPlatform();
+}
+
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
@@ -19,6 +26,23 @@ const nextConfig: NextConfig = {
   eslint: {
     // 构建时忽略ESLint错误
     ignoreDuringBuilds: true,
+  },
+  
+  // === CLOUDFLARE PAGES CONFIGURATIONS ===
+  // Export static HTML files untuk Cloudflare Pages
+  output: 'export',
+  
+  // Tambahkan trailing slash untuk routing yang benar
+  trailingSlash: true,
+  
+  // Non-aktifkan image optimization (Cloudflare Pages tidak mendukung)
+  images: {
+    unoptimized: true,
+  },
+  
+  // Environment variables untuk production
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
 };
 
