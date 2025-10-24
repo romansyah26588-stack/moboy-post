@@ -1,3 +1,5 @@
+// File: src/app/api/contents/[id]/view/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
@@ -31,11 +33,12 @@ export function OPTIONS() {
 // --- [ HANDLER POST: Menambah View Count ] ---
 export async function POST(
     request: NextRequest,
-    context: { env: Env, params: { id: string } } // Menggunakan context untuk env dan params
+    { params }: { params: { id: string } }, // Argumen kedua UNTUK PARAMS
+    context: { env: Env }                   // Argumen ketiga UNTUK ENV
 ) {
     try {
-        const db = context.env.DB;
-        const contentId = context.params.id; // Mengambil ID dari URL path
+        const db = context.env.DB;          // Tetap sama
+        const contentId = params.id;         // Mengambil ID dari params
 
         if (!contentId) {
              return NextResponse.json(
