@@ -1,46 +1,96 @@
-// src/app/api/contents/route.ts (Di dalam export async function POST)
+// File: src/app/api/contents/route.ts
 
-// ... pastikan Anda memiliki impor ini di bagian atas:
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge'; 
+export const runtime = 'edge';
+
 interface Env {
-    DB: D1Database;
+    DB: D1Database;
 }
 
-// --- [ HANDLER POST: Membuat Konten ] ---
-export async function POST(request: NextRequest, context: { env: Env }) {
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export function OPTIONS() {
+    return new NextResponse(null, {
+        status: 204,
+        headers: corsHeaders
+    });
+}
+
+export async function POST(
+    request: NextRequest,
+    { env }: { env: Env }
+) {
     try {
-        const db = context.env.DB;
+        const db = env.DB;
         const body = await request.json();
-        const { link, walletAddress } = body;
+        const { title, description, walletAddress } = body;
 
-        if (!link || !walletAddress) {
-            // ... (error 400)
+        if (!title || !walletAddress) {
+            return NextResponse.json(
+                { error: 'Title and walletAddress are required' },
+                { status: 400, headers: corsHeaders }
+            );
         }
-        
-        // **PERBAIKAN KRITIS UNTUK INSERT:** Hasilkan ID unik.
-        const newContentId = randomUUID(); // Menggunakan randomUUID
 
-        // Log untuk debug
-        console.log(`Attempting INSERT for new content ID: ${newContentId} by wallet: ${walletAddress}`);
+        const contentId = `content_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const now = new Date().toISOString();
 
-        // Kueri INSERT yang membutuhkan ID
-        await db.prepare(`
-            INSERT INTO Content (id, link, userId, viewCount, isActive, createdAt, updatedAt)
-            VALUES (?, ?, ?, 0, 1, datetime('now'), datetime('now'))
-        `).bind(newContentId, link.trim(), walletAddress.trim()).run();
+        const result = await db.prepare(`
+            INSERT INTO Content (id, title, description, walletAddress, createdAt, updatedAt, viewCount)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+        `).bind(
+            contentId,
+            title,
+            description || null,
+            walletAddress,
+            now,
+            now
+        ).run();
+
+        if (result.success) {
+            return NextResponse.json(
+                { message: 'Content created successfully', contentId: contentId },
+                { status: 201, headers: corsHeaders }
+            );
+        } else {
+            throw new Error('Failed to insert content into database');
+        }
+
+    } catch (error: any) {
+        console.error('Error creating content (D1):', error);
+        return NextResponse.json(
+            { error: 'Failed to create content', detail: error.message || 'Unknown Error' },
+            { status: 500, headers: corsHeaders }
+        );
+    }
+}
+
+export async function GET(
+    request: NextRequest,
+    { env }: { env: Env }
+) {
+    try {
+        const db = env.DB;
+        const { results } = await db.prepare(`
+            SELECT id, title, description, walletAddress, createdAt, viewCount
+            FROM Content
+            ORDER BY createdAt DESC
+        `).all();
 
         return NextResponse.json(
-            { message: "Content created successfully", id: newContentId },
-            { status: 201, headers: corsHeaders }
+            { contents: results || [] },
+            { status: 200, headers: corsHeaders }
         );
 
     } catch (error: any) {
-        // Logging error yang rinci untuk membantu mengatasi Error 500
-        console.error('D1 POST Content Query FAILED:', error.stack || error.message);
+        console.error('Error fetching contents (D1):', error);
         return NextResponse.json(
-            { error: 'Failed to create content', detail: error.message || 'Unknown D1 POST Error' },
+            { error: 'Failed to fetch contents', detail: error.message || 'Unknown Error' },
             { status: 500, headers: corsHeaders }
         );
     }
