@@ -1,3 +1,5 @@
+// File: src/app/api/contents/[id]/view/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // WAJIB ADA: Mengatur rute untuk berjalan di Cloudflare Edge Runtime
@@ -23,19 +25,15 @@ export function OPTIONS() {
     });
 }
 
-// Fungsi GET tidak diimplementasikan, bisa dibiarkan kosong atau dihapus jika tidak perlu.
-// export async function GET(request: NextRequest, context: { env: Env }) {
-//     return NextResponse.json({ message: "Not implemented" }, { status: 200, headers: corsHeaders });
-// }
-
 // --- [ HANDLER POST: Menambah View Count ] ---
 export async function POST(
     request: NextRequest,
-    context: { env: Env, params: { id: string } } // Menggunakan context untuk env dan params
+    { params }: { params: { id: string } }, // Argumen kedua UNTUK PARAMS
+    context: { env: Env }                   // Argumen ketiga UNTUK ENV
 ) {
     try {
-        const db = context.env.DB;
-        const contentId = context.params.id; // Mengambil ID dari URL path
+        const db = context.env.DB;          // Tetap sama
+        const contentId = params.id;         // Mengambil ID dari params
 
         if (!contentId) {
              return NextResponse.json(
@@ -53,8 +51,6 @@ export async function POST(
 
         // 2. Jika update gagal (ID tidak ditemukan)
         if (updateResult.changes === 0) {
-            // Perlu dicek apakah ID ditemukan, jika 0 artinya tidak ada row yang terpengaruh
-             // Jika ingin mendapatkan viewCount terbaru, lakukan SELECT setelah UPDATE.
              return NextResponse.json(
                 { error: 'Content not found or update failed' },
                 { status: 404, headers: corsHeaders }
