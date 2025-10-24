@@ -1,97 +1,137 @@
 // File: src/app/api/contents/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-
 export const runtime = 'edge';
 
-interface Env {
-    DB: D1Database;
+function validateContentLink(link: string): boolean {
+  try {
+    const url = new URL(link.trim().toLowerCase());
+    
+    // Check if the protocol is http or https
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return false;
+    }
+    
+    // Check if it has a valid domain
+    if (!url.hostname || url.hostname.length < 3) {
+      return false;
+    }
+    
+    // Allow any valid TLD
+    const validTLDs = [
+      'com', 'org', 'net', 'io', 'co', 'app', 'dev', 'tech', 'ai',
+      'xyz', 'me', 'site', 'online', 'store', 'shop', 'blog', 'news',
+      'info', 'biz', 'us', 'uk', 'ca', 'au', 'de', 'fr', 'jp', 'kr',
+      'cn', 'in', 'br', 'mx', 'es', 'it', 'nl', 'se', 'no', 'fi',
+      'ru', 'tr', 'sa', 'ae', 'eg', 'za', 'ng', 'ke', 'gh', 'ph',
+      'th', 'vn', 'my', 'sg', 'id', 'pk', 'bd', 'lk', 'np', 'mm'
+    ];
+    
+    const domainParts = url.hostname.split('.');
+    const tld = domainParts[domainParts.length - 1];
+    
+    return validTLDs.includes(tld);
+    
+  } catch (error) {
+    return false;
+  }
 }
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-export function OPTIONS() {
-    return new NextResponse(null, {
-        status: 204,
-        headers: corsHeaders
+export async function GET() {
+  try {
+    const contents = await db.content.findMany({
+      include: {
+        user: {
+          select: {
+            walletAddress: true,
+            name: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
+
+    return NextResponse.json(contents);
+  } catch (error) {
+    console.error('Error fetching contents:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch contents' },
+      { status: 500 }
+    );
+  }
 }
 
-export async function POST(
-    request: NextRequest,
-    { env }: { env: Env }
-) {
-    try {
-        const db = env.DB;
-        const body = await request.json();
-        const { title, description, walletAddress } = body;
+export async function POST(request: NextRequest) {
+  try {
+    const { link, walletAddress } = await request.json();
 
-        if (!title || !walletAddress) {
-            return NextResponse.json(
-                { error: 'Title and walletAddress are required' },
-                { status: 400, headers: corsHeaders }
-            );
-        }
-
-        const contentId = `content_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        const now = new Date().toISOString();
-
-        const result = await db.prepare(`
-            INSERT INTO Content (id, title, description, walletAddress, createdAt, updatedAt, viewCount)
-            VALUES (?, ?, ?, ?, ?, ?, 0)
-        `).bind(
-            contentId,
-            title,
-            description || null,
-            walletAddress,
-            now,
-            now
-        ).run();
-
-        if (result.success) {
-            return NextResponse.json(
-                { message: 'Content created successfully', contentId: contentId },
-                { status: 201, headers: corsHeaders }
-            );
-        } else {
-            throw new Error('Failed to insert content into database');
-        }
-
-    } catch (error: any) {
-        console.error('Error creating content (D1):', error);
-        return NextResponse.json(
-            { error: 'Failed to create content', detail: error.message || 'Unknown Error' },
-            { status: 500, headers: corsHeaders }
-        );
+    if (!link || !walletAddress) {
+      return NextResponse.json(
+        { error: 'Link and wallet address are required' },
+        { status: 400 }
+      );
     }
-}
 
-export async function GET(
-    request: NextRequest,
-    { env }: { env: Env }
-) {
-    try {
-        const db = env.DB;
-        const { results } = await db.prepare(`
-            SELECT id, title, description, walletAddress, createdAt, viewCount
-            FROM Content
-            ORDER BY createdAt DESC
-        `).all();
-
-        return NextResponse.json(
-            { contents: results || [] },
-            { status: 200, headers: corsHeaders }
-        );
-
-    } catch (error: any) {
-        console.error('Error fetching contents (D1):', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch contents', detail: error.message || 'Unknown Error' },
-            { status: 500, headers: corsHeaders }
-        );
+    // Validate the link
+    if (!validateContentLink(link)) {
+      return NextResponse.json(
+        { error: 'Failed To Submit (Not Content Link)' },
+        { status: 400 }
+      );
     }
+
+    // Check for duplicate link
+    const existingContent = await db.content.findFirst({
+      where: {
+        link: link.trim().toLowerCase()
+      }
+    });
+
+    if (existingContent) {
+      return NextResponse.json(
+        { error: 'Failed To Submit (Content Link Already Exists)' },
+        { status: 409 }
+      );
+    }
+
+    // Find or create user
+    let user = await db.user.findUnique({
+      where: { walletAddress }
+    });
+
+    if (!user) {
+      user = await db.user.create({
+        data: {
+          walletAddress,
+        }
+      });
+    }
+
+    // Create content
+    const content = await db.content.create({
+      data: {
+        link: link.trim(),
+        userId: user.id,
+        walletAddress,
+      },
+      include: {
+        user: {
+          select: {
+            walletAddress: true,
+            name: true,
+          }
+        }
+      }
+    });
+
+    return NextResponse.json(content, { status: 201 });
+  } catch (error) {
+    console.error('Error creating content:', error);
+    return NextResponse.json(
+      { error: 'Failed to create content' },
+      { status: 500 }
+    );
+  }
 }
