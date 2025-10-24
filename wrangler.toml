@@ -1,17 +1,19 @@
 # wrangler.toml
+
 name = "moboy-post"
 compatibility_date = "2024-05-12"
 compatibility_flags = ["nodejs_compat"]
+
+# --- Konfigurasi untuk OpenNext ---
 pages_build_output_dir = ".vercel/output/static"
 
-# --- PINDAHKAN KONFIGURASI INI KE LEVEL ATAS ---
-# D1 Database untuk production (dan preview, karena sama)
+# D1 Database binding
 [[d1_databases]]
 binding = "DB"
 database_name = "db_moboy"
-database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865"
+database_id = "cc8b6847-ed79-46b9-ab92-dbb265ec9865" # <-- PASTIKAN ID INI BENAR
 
-# Variabel Lingkungan untuk production (dan preview)
+# Variabel Lingkungan
 [vars]
 ENVIRONMENT = "production"
 NEXTAUTH_URL = "https://moboy-post.pages.dev"
