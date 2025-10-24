@@ -1,4 +1,4 @@
-// File: src/app/api/contents/[id]/view/route.ts
+// File: src/app/api/contents/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -13,7 +13,7 @@ interface Env {
 // Headers CORS
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -25,60 +25,86 @@ export function OPTIONS() {
     });
 }
 
-// Fungsi GET tidak diimplementasikan, bisa dibiarkan kosong atau dihapus jika tidak perlu.
-// export async function GET(request: NextRequest, context: { env: Env }) {
-//     return NextResponse.json({ message: "Not implemented" }, { status: 200, headers: corsHeaders });
-// }
-
-// --- [ HANDLER POST: Menambah View Count ] ---
+// --- [ HANDLER POST: Membuat Content Baru ] ---
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }, // Argumen kedua UNTUK PARAMS
-    context: { env: Env }                   // Argumen ketiga UNTUK ENV
+    { env }: { env: Env } // <--- ARGUMEN KEDUA LANGSUNG UNTUK ENV (ROUTE STATIS)
 ) {
     try {
-        const db = context.env.DB;          // Tetap sama
-        const contentId = params.id;         // Mengambil ID dari params
+        const db = env.DB;
 
-        if (!contentId) {
-             return NextResponse.json(
-                { error: 'Content ID is required' },
+        // 1. Ambil data dari body request
+        const body = await request.json();
+        const { title, description, walletAddress } = body;
+
+        // Validasi input sederhana
+        if (!title || !walletAddress) {
+            return NextResponse.json(
+                { error: 'Title and walletAddress are required' },
                 { status: 400, headers: corsHeaders }
             );
         }
 
-        // 1. Lakukan INCREMENT viewCount menggunakan SQL D1
-        const updateResult = await db.prepare(`
-            UPDATE Content 
-            SET viewCount = viewCount + 1, updatedAt = datetime('now')
-            WHERE id = ?
-        `).bind(contentId).run();
+        // 2. Buat ID unik (misalnya menggunakan timestamp dan random string)
+        const contentId = `content_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const now = new Date().toISOString();
 
-        // 2. Jika update gagal (ID tidak ditemukan)
-        if (updateResult.changes === 0) {
-            // Perlu dicek apakah ID ditemukan, jika 0 artinya tidak ada row yang terpengaruh
-             // Jika ingin mendapatkan viewCount terbaru, lakukan SELECT setelah UPDATE.
-             return NextResponse.json(
-                { error: 'Content not found or update failed' },
-                { status: 404, headers: corsHeaders }
+        // 3. Lakukan INSERT ke tabel Content
+        const result = await db.prepare(`
+            INSERT INTO Content (id, title, description, walletAddress, createdAt, updatedAt, viewCount)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+        `).bind(
+            contentId,
+            title,
+            description || null, // Gunakan null jika description tidak ada
+            walletAddress,
+            now,
+            now
+        ).run();
+
+        // 4. Cek apakah insert berhasil
+        if (result.success) {
+            return NextResponse.json(
+                { message: 'Content created successfully', contentId: contentId },
+                { status: 201, headers: corsHeaders } // 201 Created
             );
+        } else {
+            throw new Error('Failed to insert content into database');
         }
-        
-        // 3. Ambil viewCount yang baru (perlu kueri terpisah di D1/SQLite)
-        const content = await db.prepare(`
-            SELECT viewCount FROM Content WHERE id = ?
-        `).bind(contentId).first<{ viewCount: number }>();
 
+    } catch (error: any) {
+        console.error('Error creating content (D1):', error);
+        return NextResponse.json(
+            { error: 'Failed to create content', detail: error.message || 'Unknown Error' },
+            { status: 500, headers: corsHeaders }
+        );
+    }
+}
+
+// --- [ HANDLER GET: Mengambil Daftar Content ] ---
+export async function GET(
+    request: NextRequest,
+    { env }: { env: Env } // <--- ARGUMEN KEDUA LANGSUNG UNTUK ENV (ROUTE STATIS)
+) {
+    try {
+        const db = env.DB;
+
+        // 1. Ambil semua content dari tabel
+        const { results } = await db.prepare(`
+            SELECT id, title, description, walletAddress, createdAt, viewCount
+            FROM Content
+            ORDER BY createdAt DESC
+        `).all();
 
         return NextResponse.json(
-            { viewCount: content ? content.viewCount : null, message: "View count incremented" },
+            { contents: results || [] },
             { status: 200, headers: corsHeaders }
         );
 
     } catch (error: any) {
-        console.error('Error incrementing view count (D1):', error);
+        console.error('Error fetching contents (D1):', error);
         return NextResponse.json(
-            { error: 'Failed to increment view count', detail: error.message || 'Unknown Error' },
+            { error: 'Failed to fetch contents', detail: error.message || 'Unknown Error' },
             { status: 500, headers: corsHeaders }
         );
     }
